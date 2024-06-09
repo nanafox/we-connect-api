@@ -16,7 +16,11 @@ class APICrudBase(Generic[ModelType, SchemaType]):
 
     @staticmethod
     def get_detailed_error(error: Exception):
-        detail_error = error.args[0].split("\n")[1]
+        try:
+            detail_error = error.args[0].split("\n")[1]
+        except IndexError:
+            return "The data provided is not correct"
+
         detail_error = detail_error.replace("DETAIL:  Key ", "")
         detail_error = (
             detail_error.replace("(", "").replace(")=", " ").replace(")", "")
@@ -42,12 +46,32 @@ class APICrudBase(Generic[ModelType, SchemaType]):
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
-    def get_all(self, *, db: Session, skip: int = 0, limit: int = 100):
-        return db.query(self.model).offset(skip).limit(limit).all()
+    def get_all(self, *, db: Session, **search_fields) -> list[ModelType]:
+        skip = search_fields.pop("skip", 0)
+        limit = search_fields.pop("limit", 100)
+        order_by = search_fields.pop("order_by", None)
+
+        try:
+            return (
+                db.query(self.model)
+                .order_by(order_by)
+                .filter_by(**search_fields)
+                .offset(skip)
+                .limit(limit)
+                .all()
+            )
+        except Exception as error:
+            raise HTTPException(
+                detail={
+                    "message": f"Error fetching {self.model_name} objects",
+                    "reason": str(error).replace('"', "'"),
+                },
+                status_code=status.HTTP_400_BAD_REQUEST,
+            ) from error
 
     def create(self, db: Session, schema: SchemaType):
         try:
-            return self.model(**schema.model_dump()).save(db=db)
+            return self.model().save(**schema.model_dump(), db=db)
         except Exception as error:
             raise HTTPException(
                 detail={
