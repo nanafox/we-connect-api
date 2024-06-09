@@ -1,17 +1,10 @@
-import sqlalchemy
-from posts_app.database import Base
-from sqlalchemy import (
-    TIMESTAMP,
-    Column,
-    String,
-    Boolean,
-    Integer,
-    func,
-    text,
-)
 from datetime import datetime
 from uuid import uuid4
 
+import sqlalchemy
+from sqlalchemy import TIMESTAMP, Boolean, Column, Integer, String, func, text
+
+from posts_app.database import Base
 from posts_app.utils import UtilMixin
 
 
