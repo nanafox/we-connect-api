@@ -65,5 +65,17 @@ class UserBase(BaseModel):
     email: EmailStr
 
 
-class UserCreate(UserBase):
+class UserCreateUpdate(UserBase):
     password: str
+
+
+class User(UserBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class StatusResponse(BaseModel):
+    status: str = "OK"
