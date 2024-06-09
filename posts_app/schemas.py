@@ -2,8 +2,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import EmailStr
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, EmailStr, HttpUrl
 
 
 class PostBase(BaseModel):
@@ -77,5 +76,10 @@ class User(UserBase):
     class Config:
         from_attributes = True
 
+
 class StatusResponse(BaseModel):
     status: str = "OK"
+
+
+class UserLogin(UserCreateUpdate):
+    pass
