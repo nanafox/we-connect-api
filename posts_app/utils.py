@@ -2,8 +2,11 @@ import json
 import os
 
 from faker import Faker
+from fastapi import HTTPException, Request, status
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def get_dummy_data(count: int = 1000) -> list[dict]:
@@ -29,6 +32,7 @@ def get_dummy_data(count: int = 1000) -> list[dict]:
 
 
 class UtilMixin:
+
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
@@ -43,6 +47,9 @@ class UtilMixin:
                         "next_steps": "Verify you provided the right data.",
                     },
                 )
+            if key == "password":
+                value = pwd_context.hash(value)
+                print("hashed password:", value)
 
             setattr(self, key, value)
 
@@ -50,3 +57,11 @@ class UtilMixin:
         db.commit()
         db.refresh(self)
         return self
+
+
+def get_query_params(request: Request):
+    return request.query_params
+
+
+def is_valid_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
