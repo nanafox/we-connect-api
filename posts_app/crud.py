@@ -1,117 +1,73 @@
-from typing import Generic
+from typing import Generic, TypeVar
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from posts_app import models, schemas
+ModelType = TypeVar("ModelType")
+SchemaType = TypeVar("SchemaType", bound=BaseModel)
 
 
-def get_post_by_id(db: Session, post_id: str) -> models.Post:
-    """
-    Returns the post that matches the specified id.
+class APICrudBase(Generic[ModelType, SchemaType]):
+    def __init__(self, model: ModelType):
+        self.model = model
+        self.model_name = model.__name__
 
-    Args:
-        db (Session): The database session (connection) to use.
-        post_id (str): The id of the post to retrieve.
+    @staticmethod
+    def get_detailed_error(error: Exception):
+        detail_error = error.args[0].split("\n")[1]
+        detail_error = detail_error.replace("DETAIL:  Key ", "")
+        detail_error = (
+            detail_error.replace("(", "").replace(")=", " ").replace(")", "")
+        )
+        return detail_error
 
-    Raises:
-        HTTPException: If the id provided was invalid or matched nothing.
+    def get_by_id(self, *, db: Session, id: str) -> ModelType:
+        try:
+            UUID(id)
+        except ValueError as error:
+            raise HTTPException(
+                detail=f"invalid {self.model_name} id",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            ) from error
+        else:
+            obj = db.query(self.model).filter(self.model.id == id).first()
 
-    Returns:
-        models.Post: The post object if it was matched.
-    """
-    try:
-        UUID(post_id)
-    except ValueError as error:
+        if obj:
+            return obj
+
         raise HTTPException(
-            detail="invalid post id",
-            status_code=status.HTTP_400_BAD_REQUEST,
-        ) from error
-    else:
-        post_data = (
-            db.query(models.Post).filter(models.Post.id == post_id).first()
+            detail=f"{self.model_name} not found",
+            status_code=status.HTTP_404_NOT_FOUND,
         )
 
-    if post_data:
-        return post_data
+    def get_all(self, *, db: Session, skip: int = 0, limit: int = 100):
+        return db.query(self.model).offset(skip).limit(limit).all()
 
-    raise HTTPException(
-        detail="post not found", status_code=status.HTTP_404_NOT_FOUND
-    )
+    def create(self, db: Session, schema: SchemaType):
+        try:
+            return self.model(**schema.model_dump()).save(db=db)
+        except Exception as error:
+            raise HTTPException(
+                detail={
+                    "message": f"Error creating {self.model_name}",
+                    "reason": self.get_detailed_error(error),
+                },
+                status_code=status.HTTP_400_BAD_REQUEST,
+            ) from error
 
+    def update(self, *, db: Session, schema: SchemaType, id: str):
+        obj = self.get_by_id(db=db, id=id)
+        return obj.save(**schema.model_dump(), db=db)
 
-def get_posts(
-    db: Session, skip: int = 0, limit: int = 100
-) -> list[schemas.Post]:
-    """
-    Retrieves all post
+    def delete(self, db: Session, id: str):
+        obj = self.get_by_id(db=db, id=id)
 
-    Args:
-        db (Session): The database session (connection) to use.
-        skip (int, optional): The offset to start from. Defaults to 0.
-        limit (int, optional): The upper bound limit of objects to return.
-        Defaults to 100.
+        db.delete(obj)
+        db.commit()
 
-    Returns:
-        list[schemas.Post]: A list of post objects
-    """
-    return db.query(models.Post).offset(skip).limit(limit).all()
-
-
-def create_update_post(
-    db: Session, post: schemas.PostCreateUpdate, post_id: str = None
-) -> models.Post:
-    """
-    Creates or updates a post.
-
-    Args:
-        db (Session): The database session (connection) to use.
-        post (schemas.PostCreateUpdate): The post object schema.
-        post_id (str, optional): The id of the post to update. This is only
-        required for updates (PUT requests). Defaults to None.
-
-    Returns:
-        models.Post: The created or the updated post.
-    """
-    if post_id:
-        new_post = get_post_by_id(db=db, post_id=post_id)
-    else:
-        new_post = models.Post(**post.model_dump())
-
-    return new_post.save(**post.model_dump(), db=db)
-
-
-def delete_post(db: Session, post_id: str):
-    """
-    Deletes a post.
-
-    Args:
-        db (Session): The database session (connection) to use.
-        post_id (str): The id of the post to delete.
-    """
-    post = get_post_by_id(db=db, post_id=post_id)
-
-    db.delete(post)
-    db.commit()
-
-
-def partial_post_update(
-    db: Session, post: schemas.PostPartialUpdate, post_id: str
-) -> models.Post:
-    """
-    Partially updates a post object.
-
-    This is useful when performing PATCH requests on the API endpoint.
-
-    Args:
-        db (Session): The database session (connection) to use.
-        post (schemas.PostPartialUpdate): The schema of the post object.
-        post_id (str): The id of the post to be updated.
-
-    Returns:
-        models.Post: The updated post.
-    """
-    stored_post = get_post_by_id(post_id=post_id, db=db)
-    update_data = post.model_dump(exclude_unset=True)
-    return stored_post.save(**update_data, db=db)
+    def partial_update(self, *, db: Session, schema: SchemaType, id: str):
+        stored_obj = self.get_by_id(id=id, db=db)
+        update_data = schema.model_dump(exclude_unset=True)
+        return stored_obj.save(**update_data, db=db)
