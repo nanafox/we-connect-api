@@ -5,6 +5,8 @@ from fastapi import HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from posts_app import models, schemas
+
 ModelType = TypeVar("ModelType")
 SchemaType = TypeVar("SchemaType", bound=BaseModel)
 
@@ -69,8 +71,17 @@ class APICrudBase(Generic[ModelType, SchemaType]):
                 status_code=status.HTTP_400_BAD_REQUEST,
             ) from error
 
-    def create(self, db: Session, schema: SchemaType):
+    def create(
+        self,
+        db: Session,
+        schema: SchemaType,
+        obj_owner_id: str | None = None,
+    ):
         try:
+            if obj_owner_id:
+                return self.model().save(
+                    user_id=obj_owner_id, **schema.model_dump(), db=db
+                )
             return self.model().save(**schema.model_dump(), db=db)
         except Exception as error:
             raise HTTPException(
@@ -81,17 +92,105 @@ class APICrudBase(Generic[ModelType, SchemaType]):
                 status_code=status.HTTP_400_BAD_REQUEST,
             ) from error
 
-    def update(self, *, db: Session, schema: SchemaType, id: str):
+    def update(
+        self,
+        *,
+        db: Session,
+        schema: SchemaType,
+        id: str,
+        obj_owner_id: str,
+    ):
         obj = self.get_by_id(db=db, id=id)
+        if not obj_owner_id == obj.id:
+            raise HTTPException(
+                detail="You are not authorized to update this "
+                f"{self.model_name}",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
         return obj.save(**schema.model_dump(), db=db)
 
-    def delete(self, db: Session, id: str):
+    def delete(
+        self,
+        db: Session,
+        id: str,
+        obj_owner_id: str,
+    ):
         obj = self.get_by_id(db=db, id=id)
+        if not obj_owner_id == obj.id:
+            raise HTTPException(
+                detail="You are not authorized to delete this "
+                f"{self.model_name}",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        obj.delete(db=db)
 
-        db.delete(obj)
-        db.commit()
-
-    def partial_update(self, *, db: Session, schema: SchemaType, id: str):
+    def partial_update(
+        self,
+        *,
+        db: Session,
+        schema: SchemaType,
+        id: str,
+        obj_owner_id: str,
+    ):
         stored_obj = self.get_by_id(id=id, db=db)
+        if not obj_owner_id == stored_obj.id:
+            raise HTTPException(
+                detail=f"You are not authorized to update this "
+                f"{self.model_name}",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
         update_data = schema.model_dump(exclude_unset=True)
         return stored_obj.save(**update_data, db=db)
+
+
+class PostCRUD(APICrudBase[models.Post, schemas.Post]):
+    def update(
+        self,
+        *,
+        db: Session,
+        schema: schemas.PostCreateUpdate,
+        id: str,
+        obj_owner_id: str,
+    ):
+        obj = self.get_by_id(db=db, id=id)
+        if not obj_owner_id == obj.user_id:
+            raise HTTPException(
+                detail="You are not authorized to update this post",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        return obj.save(**schema.model_dump(), db=db)
+
+    def delete(
+        self,
+        db: Session,
+        id: str,
+        obj_owner_id: str,
+    ):
+        obj = self.get_by_id(db=db, id=id)
+        if not obj_owner_id == obj.user_id:
+            raise HTTPException(
+                detail="You are not authorized to delete this post",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        obj.delete(db=db)
+
+    def partial_update(
+        self,
+        *,
+        db: Session,
+        schema: schemas.PostPartialUpdate,
+        id: str,
+        obj_owner_id: str,
+    ):
+        stored_obj = self.get_by_id(id=id, db=db)
+        if not obj_owner_id == stored_obj.user_id:
+            raise HTTPException(
+                detail="You are not authorized to update this post",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        update_data = schema.model_dump(exclude_unset=True)
+        return stored_obj.save(**update_data, db=db)
+
+
+crud_user = APICrudBase[models.User, schemas.User](models.User)
+crud_post = PostCRUD(models.Post)
