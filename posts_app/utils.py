@@ -49,7 +49,6 @@ class UtilMixin:
                 )
             if key == "password":
                 value = pwd_context.hash(value)
-                print("hashed password:", value)
 
             setattr(self, key, value)
 
@@ -57,6 +56,11 @@ class UtilMixin:
         db.commit()
         db.refresh(self)
         return self
+
+    def delete(self, db: Session):
+        """Deletes the post object."""
+        db.delete(self)
+        db.commit()
 
 
 def get_query_params(request: Request):
