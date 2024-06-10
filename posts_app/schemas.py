@@ -1,8 +1,19 @@
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, HttpUrl
+
+
+class Rating(int, Enum):
+    """Enum for post ratings."""
+
+    poor = 1
+    not_bad = 2
+    liked_it = 3
+    amazing = 4
+    awesome = 5
 
 
 class PostBase(BaseModel):
@@ -11,13 +22,14 @@ class PostBase(BaseModel):
     title: str
     content: str
     published: bool = True
-    rating: Optional[int] = None
+    rating: Optional[Rating] = None
 
 
 class Post(PostBase):
     """Schema for displaying a single post response"""
 
     id: UUID
+    user_id: UUID
     created_at: datetime
     updated_at: datetime
 
@@ -28,7 +40,18 @@ class Post(PostBase):
 class PostCreateUpdate(PostBase):
     """Schema for creating and updating posts."""
 
-    pass
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "title": "How to create a REST API",
+                    "content": "This is a tutorial on how to create a REST API using FastAPI.",
+                    "published": True,
+                    "rating": 4,
+                },
+            ]
+        }
+    }
 
 
 class PostPartialUpdate(BaseModel):
@@ -37,7 +60,7 @@ class PostPartialUpdate(BaseModel):
     title: str | None = None
     content: str | None = None
     published: bool = True
-    rating: Optional[int] = None
+    rating: Optional[Rating] = None
 
 
 class Link(BaseModel):
@@ -83,3 +106,22 @@ class StatusResponse(BaseModel):
 
 class UserLogin(UserCreateUpdate):
     pass
+
+
+class Token(BaseModel):
+    """
+    Schema for the token response.
+
+    - **access_token**: The token to be used for authentication.
+    - **token_type**: The type of token.
+    - **expire_in**: The time in minutes the token will expire.
+    """
+
+    access_token: str
+    token_type: str = "bearer"
+    expire_in: int
+
+
+class TokenData(BaseModel):
+    id: UUID
+    email: EmailStr
