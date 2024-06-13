@@ -1,42 +1,36 @@
-import os
 from datetime import datetime, timedelta
 from typing import Annotated
 
 import jwt
-from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 
 from posts_app import models, schemas
 from posts_app.api.routers.deps import DBSessionDependency
+from posts_app.config import settings
 
-load_dotenv()
-
-
-SECRET_KEY = os.environ.get("SECRET_KEY")
-ALGORITHM = os.environ.get("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(
-    os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES")
-)
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
 
 
 def create_access_token(
     data: dict, expires_delta: timedelta | None = None
 ) -> str:
+    """Creates a JWT Access Token for API access."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now() + expires_delta
     else:
         expire = datetime.now() + timedelta(
-            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+            minutes=settings.access_token_expire_minutes
         )
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(
-        payload=to_encode, key=SECRET_KEY, algorithm=ALGORITHM
+        payload=to_encode,
+        key=settings.secret_key,
+        algorithm=settings.oauth2_algorithm,
     )
+    settings.access_token_expire_minutes = expire
     return encoded_jwt
 
 
@@ -44,28 +38,36 @@ async def verify_access_token(
     token: Annotated[str, Depends(oauth2_scheme)],
     credentials_exception: HTTPException,
 ) -> schemas.TokenData:
+    """Verifies that the token being used is valid"""
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            token, settings.secret_key, algorithms=[settings.oauth2_algorithm]
+        )
         id = payload.get("sub")
         email = payload.get("email")
         if id is None or email is None:
             raise credentials_exception
         token_data = schemas.TokenData(id=id, email=email)
-    except InvalidTokenError:
-        raise credentials_exception
+    except InvalidTokenError as error:
+        raise credentials_exception from error
 
     return token_data
 
 
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)], db: DBSessionDependency
-) -> schemas.TokenData:
+) -> models.User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    """Returns the current authenticated user."""
 
     token_data = await verify_access_token(token, credentials_exception)
 
-    return db.query(models.User).get(token_data.id)
+    user = db.query(models.User).get(token_data.id)
+    if not user:
+        raise credentials_exception
+
+    return user
