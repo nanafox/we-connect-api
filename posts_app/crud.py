@@ -107,7 +107,16 @@ class APICrudBase(Generic[ModelType, SchemaType]):
                 f"{self.model_name}",
                 status_code=status.HTTP_403_FORBIDDEN,
             )
-        return obj.save(**schema.model_dump(), db=db)
+        try:
+            return obj.save(**schema.model_dump(), db=db)
+        except Exception as error:
+            raise HTTPException(
+                detail={
+                    "message": f"Error creating {self.model_name}",
+                    "reason": self.get_detailed_error(error),
+                },
+                status_code=status.HTTP_400_BAD_REQUEST,
+            ) from error
 
     def delete(
         self,
