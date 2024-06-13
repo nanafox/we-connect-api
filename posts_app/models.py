@@ -12,6 +12,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.orm import relationship
 
 from posts_app.database import Base
 from posts_app.utils import UtilMixin
@@ -48,6 +49,7 @@ class Post(Base, UtilMixin):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
+    user = relationship("User")
 
     def __str__(self):
         return f"Post title: {self.title}"
@@ -78,3 +80,18 @@ class User(Base, UtilMixin):
 
     def __str__(self):
         return f"Email: {self.email}"
+
+
+class Vote(Base):
+    __tablename__ = "votes"
+
+    user_id = Column(
+        sqlalchemy.Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    post_id = Column(
+        sqlalchemy.Uuid,
+        ForeignKey("posts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
