@@ -29,7 +29,7 @@ class Post(PostBase):
     """Schema for displaying a single post response"""
 
     id: UUID
-    user_id: UUID
+    user: "User"
     created_at: datetime
     updated_at: datetime
 
@@ -45,9 +45,15 @@ class PostCreateUpdate(PostBase):
             "examples": [
                 {
                     "title": "How to create a REST API",
-                    "content": "This is a tutorial on how to create a REST API using FastAPI.",
+                    "content": "This is a tutorial on how to create a REST API "
+                    "using FastAPI.",
                     "published": True,
                     "rating": 4,
+                },
+                {
+                    "title": "Getting Started with query parameter",
+                    "content": "This tutorial will take you through the basics "
+                    "of query parameters. Stay tuned.",
                 },
             ]
         }
@@ -119,9 +125,13 @@ class Token(BaseModel):
 
     access_token: str
     token_type: str = "bearer"
-    expire_in: int
+    expire_in: int | datetime
 
 
 class TokenData(BaseModel):
     id: UUID
     email: EmailStr
+
+class Vote(BaseModel):
+    post_id: UUID
+    status: bool
