@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 
-from posts_app import schemas
-from posts_app.api.routers import CurrentUserDependency
+from posts_app import oauth2, schemas
+from posts_app.api.routers import CurrentUserDependency, UserDependency
 from posts_app.api.routers.deps import (
     DBSessionDependency,
     QueryParamsDependency,
@@ -15,6 +15,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
     "/",
     response_model=list[schemas.User],
     response_description="Users retrieved successfully",
+    dependencies=[UserDependency],
 )
 async def get_users(
     query_params: QueryParamsDependency,
@@ -36,6 +37,7 @@ async def get_current_user(
     "/{user_id}",
     response_model=schemas.User,
     response_description="User retrieved successfully",
+    dependencies=[UserDependency],
 )
 async def get_user(user_id: str, db: DBSessionDependency):
     return crud_user.get_by_id(db=db, id=user_id)
@@ -54,22 +56,38 @@ async def update_user(
 
 
 @router.post(
-    "/", status_code=status.HTTP_201_CREATED, response_model=schemas.User
+    "/",
+    status_code=status.HTTP_201_CREATED,
+    response_model=schemas.User,
 )
 async def create_user(
     user: schemas.UserCreateUpdate,
     db: DBSessionDependency,
-    current_user: CurrentUserDependency,
+    request: Request,
 ):
     """This endpoint creates a new user."""
-    if current_user:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "message": "This action is forbidden.",
-                "reason": "You own an account already.",
-            },
-        )
+    data = dict(request.headers._list)
+    bearer_token = data.get(b"authorization", None)
+
+    # let's verify if the bearer token was set, it shouldn't be set when
+    # creating  a user
+    if bearer_token:
+        try:
+            user = oauth2.get_current_user(token=bearer_token, db=db)
+        except Exception as error:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Don't set the authorization header "
+                "when creating a user.",
+            ) from error
+        else:
+            # this is an authenticated user trying to create a user, this
+            # shouldn't be allowed.
+            if user:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not authorized to create a user.",
+                )
 
     return crud_user.create(db=db, schema=user)
 
