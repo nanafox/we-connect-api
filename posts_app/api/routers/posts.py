@@ -2,7 +2,10 @@ from fastapi import APIRouter, status
 
 from posts_app import schemas
 from posts_app.api.routers import CurrentUserDependency
-from posts_app.api.routers.deps import DBSessionDependency, QueryParamsDependency
+from posts_app.api.routers.deps import (
+    DBSessionDependency,
+    QueryParamsDependency,
+)
 from posts_app.crud import crud_post
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
@@ -13,6 +16,7 @@ async def get_posts(
     query_params: QueryParamsDependency,
     db: DBSessionDependency,
 ):
+    """Retrieves all the posts created by current active users."""
     posts = crud_post.get_all(db=db, **query_params)
 
     metadata = schemas.MetaData(
@@ -35,7 +39,21 @@ async def create_post(
     db: DBSessionDependency,
     user: CurrentUserDependency,
 ) -> schemas.Post:
+    """This endpoint creates a post for the authenticated user."""
     return crud_post.create(db=db, schema=post, obj_owner_id=user.id)
+
+
+@router.get("/me", response_model=list[schemas.Post])
+async def get_current_user_posts(
+    db: DBSessionDependency,
+    user: CurrentUserDependency,
+):
+    """
+    This endpoint retrieves all the posts for the current authenticated
+    user.
+    """
+    query = {"user_id": user.id}
+    return crud_post.get_all(db=db, **query)
 
 
 @router.get("/{post_id}", response_model=schemas.Post)
@@ -59,6 +77,7 @@ async def update_post(
     db: DBSessionDependency,
     user: CurrentUserDependency,
 ):
+    """Updates a post."""
     return crud_post.update(
         db=db, schema=post, id=post_id, obj_owner_id=user.id
     )
@@ -71,6 +90,7 @@ async def partial_update_post(
     db: DBSessionDependency,
     user: CurrentUserDependency,
 ):
+    """Partially updates a user's post."""
     return crud_post.partial_update(
         db=db, schema=post, id=post_id, obj_owner_id=user.id
     )
