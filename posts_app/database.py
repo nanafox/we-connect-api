@@ -1,28 +1,24 @@
-import os
-
-from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-load_dotenv()
-
+from posts_app.config import settings
 
 SQLALCHEMY_DATABASE_URL = (
     "postgresql://"
-    f"{os.environ.get('DB_USER')}:{os.environ.get('DB_PASSWORD')}"
-    f"@{os.environ.get('DB_HOST')}/{os.environ.get('DB_NAME')}"
+    f"{settings.db_user}:{settings.db_password}"
+    f"@{settings.db_host}:{settings.db_port}/{settings.db_name}"
 )
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+DBSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
 
 def get_db():
-    db = SessionLocal()
+    db = DBSession()
     try:
         yield db
     finally:
