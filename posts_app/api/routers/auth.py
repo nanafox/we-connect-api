@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from posts_app import models, oauth2, schemas
 from posts_app.api.routers.deps import DBSessionDependency
+from posts_app.config import settings
 from posts_app.utils import is_valid_password
 
 router = APIRouter(tags=["Authentication"])
@@ -44,5 +45,5 @@ def login(
     return schemas.Token(
         access_token=access_token,
         token_type="bearer",
-        expire_in=oauth2.ACCESS_TOKEN_EXPIRE_MINUTES,
+        expire_in=settings.access_token_expire_minutes,
     )
