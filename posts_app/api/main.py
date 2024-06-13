@@ -1,8 +1,8 @@
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 
 from posts_app import models, schemas
-from posts_app.api.routers import UserDependency, auth, posts, users
+from posts_app.api.routers import UserDependency, auth, posts, users, votes
 from posts_app.database import engine
 
 load_dotenv()
@@ -25,16 +25,22 @@ app = FastAPI(
             "description": "Endpoint to check the API status.",
         },
     ],
-    summary="This is a REST API for a social media app.",
-    description="This REST API allows users to create, read, update, and delete posts and users.",
+    summary="REST APIs for a simple social media app.",
+    description="This REST API allows users to create, read, update, and "
+    "delete posts and users.",
+    redoc_url="/api/docs",
+    docs_url="/api/interactive-docs",
 )
 
-app.include_router(users.router, dependencies=[UserDependency])
-app.include_router(posts.router, dependencies=[UserDependency])
-app.include_router(auth.router)
+router = APIRouter(prefix="/api")
+
+router.include_router(users.router)
+router.include_router(posts.router, dependencies=[UserDependency])
+router.include_router(auth.router)
+router.include_router(votes.router)
 
 
-@app.get(
+@router.get(
     "/status",
     response_description="API status OK",
     response_model=schemas.StatusResponse,
@@ -44,3 +50,6 @@ app.include_router(auth.router)
 def get_api_status():
     """This endpoint returns OK if the API server is up and running."""
     return {"status": "OK"}
+
+
+app.include_router(router)
