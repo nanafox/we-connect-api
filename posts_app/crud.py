@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from posts_app import models, schemas
@@ -14,7 +15,7 @@ SchemaType = TypeVar("SchemaType", bound=BaseModel)
 class APICrudBase(Generic[ModelType, SchemaType]):
     def __init__(self, model: ModelType):
         self.model = model
-        self.model_name = model.__name__
+        self.model_name = model.__name__.lower()
 
     @staticmethod
     def get_detailed_error(error: Exception):
@@ -27,12 +28,14 @@ class APICrudBase(Generic[ModelType, SchemaType]):
         detail_error = (
             detail_error.replace("(", "").replace(")=", " ").replace(")", "")
         )
+        detail_error = detail_error.replace('"', "'")
         return detail_error
 
     def get_by_id(self, *, db: Session, id: str) -> ModelType:
         try:
-            UUID(id)
-        except ValueError as error:
+            UUID(str(id))
+        except (ValueError, AttributeError) as error:
+            print(error)
             raise HTTPException(
                 detail=f"invalid {self.model_name} id",
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -48,16 +51,16 @@ class APICrudBase(Generic[ModelType, SchemaType]):
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
-    def get_all(self, *, db: Session, **search_fields) -> list[ModelType]:
-        skip = search_fields.pop("skip", 0)
-        limit = search_fields.pop("limit", 100)
-        order_by = search_fields.pop("order_by", None)
+    def get_all(self, *, db: Session, **query_fields) -> list[ModelType]:
+        skip = query_fields.pop("skip", 0)
+        limit = query_fields.pop("limit", 25)
+        order_by = query_fields.pop("order_by", None)
 
         try:
             return (
                 db.query(self.model)
                 .order_by(order_by)
-                .filter_by(**search_fields)
+                .filter_by(**query_fields)
                 .offset(skip)
                 .limit(limit)
                 .all()
@@ -152,7 +155,10 @@ class APICrudBase(Generic[ModelType, SchemaType]):
         return stored_obj.save(**update_data, db=db)
 
 
-class PostCRUD(APICrudBase[models.Post, schemas.Post]):
+class PostCrud(APICrudBase[models.Post, schemas.Post]):
+    def __init__(self, model: models.Post = models.Post):
+        super().__init__(model)
+
     def update(
         self,
         *,
@@ -200,6 +206,119 @@ class PostCRUD(APICrudBase[models.Post, schemas.Post]):
         update_data = schema.model_dump(exclude_unset=True)
         return stored_obj.save(**update_data, db=db)
 
+    def get_all(self, *, db: Session, **query_fields) -> list[schemas.Post]:
+        skip = query_fields.pop("skip", 0)
+        limit = query_fields.pop("limit", 25)
+        order_by = query_fields.pop("order_by", None)
+
+        try:
+            results = (
+                db.query(
+                    self.model, func.count(models.Vote.post_id).label("votes")
+                )
+                .filter_by(**query_fields)
+                .outerjoin(models.Vote, models.Vote.post_id == models.Post.id)
+                .group_by(models.Post.id)
+                .order_by(order_by)
+                .offset(skip)
+                .limit(limit)
+            )
+            print("\n\n", results, "\n\n\n")
+        except Exception as error:
+            raise HTTPException(
+                detail={
+                    "message": "Error fetching posts",
+                    "reason": str(error).replace('"', "'"),
+                },
+                status_code=status.HTTP_400_BAD_REQUEST,
+            ) from error
+        else:
+            # convert the list of 2-tuples to a list of dictionaries
+            return [
+                {
+                    **post.to_dict(),
+                    "votes": votes,
+                    "user": post.user.to_dict(),
+                }
+                for post, votes in results
+            ]
+
+    def get_by_id(self, *, db: Session, id: str):
+        try:
+            UUID(str(id))
+        except (ValueError, AttributeError) as error:
+            raise HTTPException(
+                detail="invalid post id",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            ) from error
+        else:
+            obj = (
+                db.query(
+                    self.model, func.count(models.Vote.post_id).label("votes")
+                )
+                .outerjoin(models.Vote, models.Vote.post_id == models.Post.id)
+                .group_by(models.Post.id)
+                .filter(models.Post.id == id)
+                .first()
+            )
+
+        if obj:
+            return {
+                **obj[0].to_dict(),
+                "votes": obj[1],
+                "user": obj[0].user.to_dict(),
+            }
+
+        raise HTTPException(
+            detail="Post not found", status_code=status.HTTP_404_NOT_FOUND
+        )
+
+
+class VoteCrud(APICrudBase[models.Vote, schemas.Vote]):
+    def __init__(self, model: models.Vote = models.Vote):
+        super().__init__(model)
+
+    def create_or_delete(self, db: Session, vote: schemas.Vote, user_id: str):
+        vote_found = (
+            db.query(models.Vote)
+            .filter(
+                models.Vote.post_id == vote.post_id,
+                models.Vote.user_id == user_id,
+            )
+            .first()
+        )
+
+        # ensure the post exists before moving forward
+        PostCrud().get_by_id(db=db, id=vote.post_id)
+
+        if vote.status:
+            if vote_found:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="You have already voted on this post",
+                )
+            try:
+                self.create(db=db, schema=vote, obj_owner_id=user_id)
+            except Exception as error:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "message": "Error creating vote",
+                        "reason": self.get_detailed_error(error),
+                    },
+                ) from error
+            return {"message": "Vote added successfully"}
+        else:
+            if not vote_found:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Vote does not exist.",
+                )
+
+            vote_found.delete(db=db)
+            return {"message": "Vote deleted successfully"}
+
 
 crud_user = APICrudBase[models.User, schemas.User](models.User)
-crud_post = PostCRUD(models.Post)
+crud_post = PostCrud()
+crud_vote = VoteCrud()
