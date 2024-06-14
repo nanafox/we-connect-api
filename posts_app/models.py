@@ -7,7 +7,6 @@ from sqlalchemy import (
     Boolean,
     Column,
     ForeignKey,
-    Integer,
     String,
     func,
     text,
@@ -34,7 +33,6 @@ class Post(Base, UtilMixin):
     title = Column(String, index=True, nullable=False)
     content = Column(String, nullable=False, index=True)
     published = Column(Boolean, server_default="True", nullable=False)
-    rating = Column(Integer, nullable=True)
     created_at = Column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
     )
