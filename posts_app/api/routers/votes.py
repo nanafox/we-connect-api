@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 
-from posts_app import models, schemas
+from posts_app import schemas
 from posts_app.api.routers import CurrentUserDependency, UserDependency
 from posts_app.api.routers.deps import DBSessionDependency
+from posts_app.crud import crud_vote
 
 router = APIRouter(
     prefix="/vote", tags=["Vote"], dependencies=[UserDependency]
@@ -16,30 +17,6 @@ def vote(
     db: DBSessionDependency,
 ):
     """This endpoint allows user to vote on a post."""
-    vote_query = db.query(models.Vote).filter(
-        models.Vote.post_id == vote.post_id,
-        models.Vote.user_id == current_user.id,
+    return crud_vote.create_or_delete(
+        db=db, vote=vote, user_id=current_user.id
     )
-
-    vote_found = vote_query.first()
-    if vote.status:
-        if vote_found:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="You can't vote on a post more than once.",
-            )
-
-        new_vote = models.Vote(post_id=vote.post_id, user_id=current_user.id)
-        db.add(new_vote)
-        db.commit()
-
-        return {"message": "Vote added successfully"}
-    else:
-        if not vote_found:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Vote does not exist.",
-            )
-
-        vote_query.delete(synchronize_session=False)
-        return {"message": "Vote deleted successfully"}
