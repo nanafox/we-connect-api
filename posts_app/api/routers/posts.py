@@ -11,22 +11,38 @@ from posts_app.crud import crud_post
 router = APIRouter(prefix="/posts", tags=["Posts"])
 
 
+def get_post_data(posts_data: list[tuple]) -> list[schemas.PostResponse]:
+    """Returns the data for the posts."""
+    data = []
+    for post, votes in posts_data:
+        data.append(
+            {
+                "post": post,
+                "votes": votes,
+            }
+        )
+    return data
+
+
 @router.get("/", response_model=schemas.PostsList)
 async def get_posts(
     query_params: QueryParamsDependency,
     db: DBSessionDependency,
-):
+) -> schemas.PostsList:
     """Retrieves all the posts created by current active users."""
-    posts = crud_post.get_all(db=db, **query_params)
+    posts_data = crud_post.get_all(db=db, **query_params)
+
+    data = get_post_data(posts_data)
 
     metadata = schemas.MetaData(
         links=schemas.Link(next=None, previous=None),
         status_code=status.HTTP_200_OK,
-        count=len(posts),
+        count=len(data),
         total_pages=1,
         current_page=1,
     )
-    return {"data": posts, "metadata": metadata}
+
+    return {"data": data, "metadata": metadata}
 
 
 @router.post(
@@ -43,22 +59,24 @@ async def create_post(
     return crud_post.create(db=db, schema=post, obj_owner_id=user.id)
 
 
-@router.get("/me", response_model=list[schemas.Post])
+@router.get("/me", response_model=list[schemas.PostResponse])
 async def get_current_user_posts(
     db: DBSessionDependency,
     user: CurrentUserDependency,
-):
+) -> list[schemas.PostResponse]:
     """
     This endpoint retrieves all the posts for the current authenticated
     user.
     """
-    return crud_post.get_all(db=db, **{"user_id": user.id})
+    return get_post_data(crud_post.get_all(db=db, **{"user_id": user.id}))
 
 
-@router.get("/{post_id}", response_model=schemas.Post)
+@router.get("/{post_id}", response_model=schemas.PostResponse)
 async def get_post(post_id: str, db: DBSessionDependency):
     """This endpoint returns a single post by its id."""
-    return crud_post.get_by_id(db=db, id=post_id)
+    post, votes = crud_post.get_by_id(db=db, id=post_id)
+
+    return {"post": post, "votes": votes}
 
 
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
