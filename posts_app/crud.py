@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from posts_app import models, schemas
@@ -63,7 +63,6 @@ class APICrudBase(Generic[ModelType, SchemaType]):
                 .filter_by(**query_fields)
                 .offset(skip)
                 .limit(limit)
-                .all()
             )
         except Exception as error:
             raise HTTPException(
@@ -156,6 +155,8 @@ class APICrudBase(Generic[ModelType, SchemaType]):
 
 
 class PostCrud(APICrudBase[models.Post, schemas.Post]):
+    """CRUD operations for the Post model."""
+
     def __init__(self, model: models.Post = models.Post):
         super().__init__(model)
 
@@ -167,7 +168,8 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
         id: str,
         obj_owner_id: str,
     ):
-        obj = self.get_by_id(db=db, id=id)
+        """Update a post."""
+        obj = self.get_by_id(db=db, id=id)[0]
         if not obj_owner_id == obj.user_id:
             raise HTTPException(
                 detail="You are not authorized to update this post",
@@ -181,7 +183,8 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
         id: str,
         obj_owner_id: str,
     ):
-        obj = self.get_by_id(db=db, id=id)
+        """Delete a post."""
+        obj = self.get_by_id(db=db, id=id)[0]
         if not obj_owner_id == obj.user_id:
             raise HTTPException(
                 detail="You are not authorized to delete this post",
@@ -197,7 +200,8 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
         id: str,
         obj_owner_id: str,
     ):
-        stored_obj = self.get_by_id(id=id, db=db)
+        """Partially update a post."""
+        stored_obj = self.get_by_id(id=id, db=db)[0]
         if not obj_owner_id == stored_obj.user_id:
             raise HTTPException(
                 detail="You are not authorized to update this post",
@@ -207,23 +211,34 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
         return stored_obj.save(**update_data, db=db)
 
     def get_all(self, *, db: Session, **query_fields) -> list[schemas.Post]:
+        """
+        Get all posts.
+
+        This can be further filtered by passing query parameters.
+        """
         skip = query_fields.pop("skip", 0)
         limit = query_fields.pop("limit", 25)
-        order_by = query_fields.pop("order_by", None)
+        order_by = query_fields.pop("order_by", self.model.created_at.desc())
+        search = query_fields.pop("search", "")
 
         try:
             results = (
                 db.query(
                     self.model, func.count(models.Vote.post_id).label("votes")
                 )
+                .filter(
+                    or_(
+                        self.model.title.icontains(search),
+                        self.model.content.icontains(search),
+                    )
+                )
                 .filter_by(**query_fields)
-                .outerjoin(models.Vote, models.Vote.post_id == models.Post.id)
-                .group_by(models.Post.id)
+                .outerjoin(models.Vote, models.Vote.post_id == self.model.id)
+                .group_by(self.model.id)
                 .order_by(order_by)
                 .offset(skip)
                 .limit(limit)
             )
-            print("\n\n", results, "\n\n\n")
         except Exception as error:
             raise HTTPException(
                 detail={
@@ -233,17 +248,10 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
                 status_code=status.HTTP_400_BAD_REQUEST,
             ) from error
         else:
-            # convert the list of 2-tuples to a list of dictionaries
-            return [
-                {
-                    **post.to_dict(),
-                    "votes": votes,
-                    "user": post.user.to_dict(),
-                }
-                for post, votes in results
-            ]
+            return results
 
     def get_by_id(self, *, db: Session, id: str):
+        """Returns a single post by its id."""
         try:
             UUID(str(id))
         except (ValueError, AttributeError) as error:
@@ -252,7 +260,7 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
                 status_code=status.HTTP_400_BAD_REQUEST,
             ) from error
         else:
-            obj = (
+            data = (
                 db.query(
                     self.model, func.count(models.Vote.post_id).label("votes")
                 )
@@ -262,16 +270,12 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
                 .first()
             )
 
-        if obj:
-            return {
-                **obj[0].to_dict(),
-                "votes": obj[1],
-                "user": obj[0].user.to_dict(),
-            }
+        if not data:
+            raise HTTPException(
+                detail="Post not found", status_code=status.HTTP_404_NOT_FOUND
+            )
 
-        raise HTTPException(
-            detail="Post not found", status_code=status.HTTP_404_NOT_FOUND
-        )
+        return data
 
 
 class VoteCrud(APICrudBase[models.Vote, schemas.Vote]):
