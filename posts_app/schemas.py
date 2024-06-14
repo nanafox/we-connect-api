@@ -1,19 +1,8 @@
 from datetime import datetime
-from enum import Enum
 from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, HttpUrl
-
-
-class Rating(int, Enum):
-    """Enum for post ratings."""
-
-    poor = 1
-    not_bad = 2
-    liked_it = 3
-    amazing = 4
-    awesome = 5
 
 
 class PostBase(BaseModel):
@@ -22,20 +11,26 @@ class PostBase(BaseModel):
     title: str
     content: str
     published: bool = True
-    rating: Optional[Rating] = None
 
 
 class Post(PostBase):
     """Schema for displaying a single post response"""
 
     id: UUID
-    votes: int
     created_at: datetime
     updated_at: datetime
     user: "PostOwner"
 
     class Config:
         from_attributes = True
+
+
+class PostResponse(BaseModel):
+    """
+    Schema for displaying a single post response with votes.
+    """
+    post: Post
+    votes: int
 
 
 class PostCreateUpdate(PostBase):
@@ -48,11 +43,10 @@ class PostCreateUpdate(PostBase):
                     "title": "How to create a REST API",
                     "content": "This is a tutorial on how to create a REST API "
                     "using FastAPI.",
-                    "published": True,
-                    "rating": 4,
+                    "published": False,
                 },
                 {
-                    "title": "Getting Started with query parameter",
+                    "title": "Getting Started with query parameters",
                     "content": "This tutorial will take you through the basics "
                     "of query parameters. Stay tuned.",
                 },
@@ -67,7 +61,6 @@ class PostPartialUpdate(BaseModel):
     title: str | None = None
     content: str | None = None
     published: bool = True
-    rating: Optional[Rating] = None
 
 
 class Link(BaseModel):
@@ -86,7 +79,7 @@ class MetaData(BaseModel):
 class PostsList(BaseModel):
     """Schema for the response of posts."""
 
-    data: List[Post]
+    data: List[PostResponse]
     metadata: MetaData
 
 
