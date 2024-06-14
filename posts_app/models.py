@@ -82,7 +82,7 @@ class User(Base, UtilMixin):
         return f"Email: {self.email}"
 
 
-class Vote(Base):
+class Vote(Base, UtilMixin):
     __tablename__ = "votes"
 
     user_id = Column(
