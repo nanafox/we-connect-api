@@ -29,9 +29,10 @@ class Post(PostBase):
     """Schema for displaying a single post response"""
 
     id: UUID
-    user: "User"
+    votes: int
     created_at: datetime
     updated_at: datetime
+    user: "PostOwner"
 
     class Config:
         from_attributes = True
@@ -125,13 +126,19 @@ class Token(BaseModel):
 
     access_token: str
     token_type: str = "bearer"
-    expire_in: int | datetime
+    expire_in: datetime
 
 
 class TokenData(BaseModel):
     id: UUID
     email: EmailStr
 
+
 class Vote(BaseModel):
     post_id: UUID
     status: bool
+
+
+class PostOwner(BaseModel):
+    email: EmailStr
+    id: UUID
