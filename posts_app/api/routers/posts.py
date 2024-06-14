@@ -52,8 +52,7 @@ async def get_current_user_posts(
     This endpoint retrieves all the posts for the current authenticated
     user.
     """
-    query = {"user_id": user.id}
-    return crud_post.get_all(db=db, **query)
+    return crud_post.get_all(db=db, **{"user_id": user.id})
 
 
 @router.get("/{post_id}", response_model=schemas.Post)
