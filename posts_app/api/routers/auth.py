@@ -45,5 +45,5 @@ def login(
     return schemas.Token(
         access_token=access_token,
         token_type="bearer",
-        expire_in=settings.access_token_expire_minutes,
+        expire_in=settings.access_token_duration,
     )

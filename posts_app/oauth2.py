@@ -30,7 +30,7 @@ def create_access_token(
         key=settings.secret_key,
         algorithm=settings.oauth2_algorithm,
     )
-    settings.access_token_expire_minutes = expire
+    settings.access_token_duration = expire
     return encoded_jwt
 
 
