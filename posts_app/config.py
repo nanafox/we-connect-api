@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     oauth2_algorithm: str
     access_token_expire_minutes: int
     access_token_duration: datetime | None = None
+    dev: bool = False
+    production_server: str | None = ""
 
     class Config:
         env_file = ".env"
