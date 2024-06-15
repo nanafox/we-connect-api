@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import func, or_
+from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import Query, Session
 
 from posts_app import models, schemas
@@ -32,8 +33,9 @@ class APICrudBase(Generic[ModelType, SchemaType]):
         return detail_error
 
     def get_by_id(self, *, db: Session, obj_id: str) -> ModelType:
+        """Returns a single object by its id."""
         try:
-            UUID(str(id))
+            UUID(str(obj_id))
         except (ValueError, AttributeError) as error:
             print(error)
             raise HTTPException(
@@ -41,7 +43,7 @@ class APICrudBase(Generic[ModelType, SchemaType]):
                 status_code=status.HTTP_400_BAD_REQUEST,
             ) from error
         else:
-            obj = db.query(self.model).filter(self.model.id == id).first()
+            obj = db.query(self.model).filter(self.model.id == obj_id).first()
 
         if obj:
             return obj
@@ -52,6 +54,7 @@ class APICrudBase(Generic[ModelType, SchemaType]):
         )
 
     def get_all(self, *, db: Session, **query_fields) -> Query:
+        """Return all objects of the model."""
         skip = query_fields.pop("skip", 0)
         limit = query_fields.pop("limit", 25)
         order_by = query_fields.pop("order_by", None)
@@ -252,7 +255,7 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
 
     def get_by_id(
         self, *, db: Session, post_id: str
-    ) -> tuple[models.Post | int]:
+    ) -> Row[tuple[models.Post, int]]:
         """Returns a single post by its id."""
         try:
             UUID(str(post_id))
@@ -262,7 +265,7 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
                 status_code=status.HTTP_400_BAD_REQUEST,
             ) from error
         else:
-            data = (
+            data: Row = (
                 db.query(
                     self.model, func.count(models.Vote.post_id).label("votes")
                 )
@@ -284,7 +287,10 @@ class VoteCrud(APICrudBase[models.Vote, schemas.Vote]):
     def __init__(self, model: models.Vote = models.Vote):
         super().__init__(model)
 
-    def create_or_delete(self, db: Session, vote: schemas.Vote, user_id: str):
+    def create_or_delete(
+        self, db: Session, vote: schemas.Vote, user_id: str
+    ) -> dict[str, str]:
+        """Adds or removes a vote from post."""
         vote_found = (
             db.query(models.Vote)
             .filter(

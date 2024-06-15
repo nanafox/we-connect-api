@@ -57,12 +57,12 @@ async def verify_access_token(
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)], db: DBSessionDependency
 ) -> models.User:
+    """Returns the current authenticated user."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    """Returns the current authenticated user."""
 
     token_data = await verify_access_token(token, credentials_exception)
 
