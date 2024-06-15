@@ -1,13 +1,13 @@
 from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from posts_app import models, schemas
-from posts_app.api.routers import UserDependency, auth, posts, users, votes
-from posts_app.database import engine
+from posts_app import schemas
+from posts_app.api.routers import auth, posts, UserDependency, users, votes
 
 load_dotenv()
 
-models.Base.metadata.create_all(bind=engine)
+# models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     servers=[{"url": "http://localhost:8000"}],
@@ -32,6 +32,16 @@ app = FastAPI(
     docs_url="/api/interactive-docs",
 )
 
+# allow everyone for now
+origins = ["*"]
+# noinspection PyTypeChecker
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 router = APIRouter(prefix="/api")
 
 router.include_router(users.router)
