@@ -43,11 +43,11 @@ async def verify_access_token(
         payload = jwt.decode(
             token, settings.secret_key, algorithms=[settings.oauth2_algorithm]
         )
-        id = payload.get("sub")
+        user_id = payload.get("sub")
         email = payload.get("email")
-        if id is None or email is None:
+        if user_id is None or email is None:
             raise credentials_exception
-        token_data = schemas.TokenData(id=id, email=email)
+        token_data = schemas.TokenData(id=user_id, email=email)
     except InvalidTokenError as error:
         raise credentials_exception from error
 

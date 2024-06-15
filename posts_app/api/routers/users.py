@@ -40,7 +40,7 @@ async def get_current_user(
     dependencies=[UserDependency],
 )
 async def get_user(user_id: str, db: DBSessionDependency):
-    return crud_user.get_by_id(db=db, id=user_id)
+    return crud_user.get_by_id(db=db, obj_id=user_id)
 
 
 @router.put("/{user_id}", response_model=schemas.User)
@@ -51,7 +51,7 @@ async def update_user(
     current_user: CurrentUserDependency,
 ):
     return crud_user.update(
-        db=db, schema=user, id=user_id, obj_owner_id=current_user.id
+        db=db, schema=user, obj_id=user_id, obj_owner_id=current_user.id
     )
 
 
@@ -66,8 +66,8 @@ async def create_user(
     request: Request,
 ):
     """This endpoint creates a new user."""
-    data = dict(request.headers._list)
-    bearer_token = data.get(b"authorization", None)
+    data = dict(request.headers.list)
+    bearer_token = data.get("authorization", None)
 
     # let's verify if the bearer token was set, it shouldn't be set when
     # creating  a user
@@ -97,4 +97,6 @@ async def delete_user(
     user_id: str, db: DBSessionDependency, current_user: CurrentUserDependency
 ):
     """This endpoint deletes a user by its id."""
-    return crud_user.delete(id=user_id, db=db, obj_owner_id=current_user.id)
+    return crud_user.delete(
+        obj_id=user_id, db=db, obj_owner_id=current_user.id
+    )

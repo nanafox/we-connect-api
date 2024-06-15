@@ -11,11 +11,11 @@ router = APIRouter(
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-def vote(
+def add_or_delete_vote(
     vote: schemas.Vote,
     current_user: CurrentUserDependency,
     db: DBSessionDependency,
-):
+) -> dict[str, str]:
     """This endpoint allows user to vote on a post."""
     return crud_vote.create_or_delete(
         db=db, vote=vote, user_id=current_user.id

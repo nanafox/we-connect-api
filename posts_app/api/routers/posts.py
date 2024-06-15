@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, status
 
 from posts_app import schemas
@@ -7,11 +9,12 @@ from posts_app.api.routers.deps import (
     QueryParamsDependency,
 )
 from posts_app.crud import crud_post
+from posts_app.schemas import MetaData
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
 
 
-def get_post_data(posts_data: list[tuple]) -> list[schemas.PostResponse]:
+def get_post_data(posts_data: list[tuple]) -> list[dict[str, Any]]:
     """Returns the data for the posts."""
     data = []
     for post, votes in posts_data:
@@ -28,7 +31,7 @@ def get_post_data(posts_data: list[tuple]) -> list[schemas.PostResponse]:
 async def get_posts(
     query_params: QueryParamsDependency,
     db: DBSessionDependency,
-) -> schemas.PostsList:
+) -> dict[str, list[dict[str, Any]] | MetaData]:
     """Retrieves all the posts created by current active users."""
     posts_data = crud_post.get_all(db=db, **query_params)
 
@@ -63,7 +66,7 @@ async def create_post(
 async def get_current_user_posts(
     db: DBSessionDependency,
     user: CurrentUserDependency,
-) -> list[schemas.PostResponse]:
+) -> list[dict[str, Any]]:
     """
     This endpoint retrieves all the posts for the current authenticated
     user.
@@ -74,7 +77,7 @@ async def get_current_user_posts(
 @router.get("/{post_id}", response_model=schemas.PostResponse)
 async def get_post(post_id: str, db: DBSessionDependency):
     """This endpoint returns a single post by its id."""
-    post, votes = crud_post.get_by_id(db=db, id=post_id)
+    post, votes = crud_post.get_by_id(db=db, post_id=post_id)
 
     return {"post": post, "votes": votes}
 
@@ -84,7 +87,7 @@ async def delete_post(
     post_id: str, db: DBSessionDependency, user: CurrentUserDependency
 ):
     """This endpoint deletes a post by its id."""
-    return crud_post.delete(id=post_id, db=db, obj_owner_id=user.id)
+    return crud_post.delete(obj_id=post_id, db=db, obj_owner_id=user.id)
 
 
 @router.put("/{post_id}", response_model=schemas.Post)
@@ -96,7 +99,7 @@ async def update_post(
 ):
     """Updates a post."""
     return crud_post.update(
-        db=db, schema=post, id=post_id, obj_owner_id=user.id
+        db=db, schema=post, post_id=post_id, user_id=user.id
     )
 
 

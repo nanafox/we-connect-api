@@ -29,6 +29,7 @@ class PostResponse(BaseModel):
     """
     Schema for displaying a single post response with votes.
     """
+
     post: Post
     votes: int
 
@@ -41,13 +42,15 @@ class PostCreateUpdate(PostBase):
             "examples": [
                 {
                     "title": "How to create a REST API",
-                    "content": "This is a tutorial on how to create a REST API "
+                    "content": "This is a tutorial on how to create a "
+                    "REST API "
                     "using FastAPI.",
                     "published": False,
                 },
                 {
                     "title": "Getting Started with query parameters",
-                    "content": "This tutorial will take you through the basics "
+                    "content": "This tutorial will take you through the "
+                    "basics "
                     "of query parameters. Stay tuned.",
                 },
             ]
@@ -114,12 +117,12 @@ class Token(BaseModel):
 
     - **access_token**: The token to be used for authentication.
     - **token_type**: The type of token.
-    - **expire_in**: The time in minutes the token will expire.
+    - **expires**: The time until when the token is still valid.
     """
 
     access_token: str
     token_type: str = "bearer"
-    expire_in: datetime
+    expires: datetime
 
 
 class TokenData(BaseModel):

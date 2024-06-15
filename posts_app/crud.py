@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query, Session
 
 from posts_app import models, schemas
 
@@ -31,7 +31,7 @@ class APICrudBase(Generic[ModelType, SchemaType]):
         detail_error = detail_error.replace('"', "'")
         return detail_error
 
-    def get_by_id(self, *, db: Session, id: str) -> ModelType:
+    def get_by_id(self, *, db: Session, obj_id: str) -> ModelType:
         try:
             UUID(str(id))
         except (ValueError, AttributeError) as error:
@@ -51,7 +51,7 @@ class APICrudBase(Generic[ModelType, SchemaType]):
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
-    def get_all(self, *, db: Session, **query_fields) -> list[ModelType]:
+    def get_all(self, *, db: Session, **query_fields) -> Query:
         skip = query_fields.pop("skip", 0)
         limit = query_fields.pop("limit", 25)
         order_by = query_fields.pop("order_by", None)
@@ -99,10 +99,10 @@ class APICrudBase(Generic[ModelType, SchemaType]):
         *,
         db: Session,
         schema: SchemaType,
-        id: str,
+        obj_id: str,
         obj_owner_id: str,
     ):
-        obj = self.get_by_id(db=db, id=id)
+        obj = self.get_by_id(db=db, obj_id=obj_id)
         if not obj_owner_id == obj.id:
             raise HTTPException(
                 detail="You are not authorized to update this "
@@ -123,10 +123,10 @@ class APICrudBase(Generic[ModelType, SchemaType]):
     def delete(
         self,
         db: Session,
-        id: str,
+        obj_id: str,
         obj_owner_id: str,
     ):
-        obj = self.get_by_id(db=db, id=id)
+        obj = self.get_by_id(db=db, obj_id=obj_id)
         if not obj_owner_id == obj.id:
             raise HTTPException(
                 detail="You are not authorized to delete this "
@@ -140,10 +140,10 @@ class APICrudBase(Generic[ModelType, SchemaType]):
         *,
         db: Session,
         schema: SchemaType,
-        id: str,
+        obj_id: str,
         obj_owner_id: str,
     ):
-        stored_obj = self.get_by_id(id=id, db=db)
+        stored_obj = self.get_by_id(obj_id=obj_id, db=db)
         if not obj_owner_id == stored_obj.id:
             raise HTTPException(
                 detail=f"You are not authorized to update this "
@@ -165,52 +165,52 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
         *,
         db: Session,
         schema: schemas.PostCreateUpdate,
-        id: str,
-        obj_owner_id: str,
+        post_id: str,
+        user_id: str,
     ):
         """Update a post."""
-        obj = self.get_by_id(db=db, id=id)[0]
-        if not obj_owner_id == obj.user_id:
+        post = self.get_by_id(db=db, post_id=post_id)[0]
+        if not user_id == post.user_id:
             raise HTTPException(
                 detail="You are not authorized to update this post",
                 status_code=status.HTTP_403_FORBIDDEN,
             )
-        return obj.save(**schema.model_dump(), db=db)
+        return post.save(**schema.model_dump(), db=db)
 
     def delete(
         self,
         db: Session,
-        id: str,
-        obj_owner_id: str,
+        post_id: str,
+        user_id: str,
     ):
         """Delete a post."""
-        obj = self.get_by_id(db=db, id=id)[0]
-        if not obj_owner_id == obj.user_id:
+        post = self.get_by_id(db=db, post_id=post_id)[0]
+        if not user_id == post.user_id:
             raise HTTPException(
                 detail="You are not authorized to delete this post",
                 status_code=status.HTTP_403_FORBIDDEN,
             )
-        obj.delete(db=db)
+        post.delete(db=db)
 
     def partial_update(
         self,
         *,
         db: Session,
         schema: schemas.PostPartialUpdate,
-        id: str,
-        obj_owner_id: str,
+        post_id: str,
+        user_id: str,
     ):
         """Partially update a post."""
-        stored_obj = self.get_by_id(id=id, db=db)[0]
-        if not obj_owner_id == stored_obj.user_id:
+        stored_post = self.get_by_id(post_id=post_id, db=db)[0]
+        if not user_id == stored_post.user_id:
             raise HTTPException(
                 detail="You are not authorized to update this post",
                 status_code=status.HTTP_403_FORBIDDEN,
             )
         update_data = schema.model_dump(exclude_unset=True)
-        return stored_obj.save(**update_data, db=db)
+        return stored_post.save(**update_data, db=db)
 
-    def get_all(self, *, db: Session, **query_fields) -> list[schemas.Post]:
+    def get_all(self, *, db: Session, **query_fields) -> Query:
         """
         Get all posts.
 
@@ -218,7 +218,7 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
         """
         skip = query_fields.pop("skip", 0)
         limit = query_fields.pop("limit", 25)
-        order_by = query_fields.pop("order_by", self.model.created_at.desc())
+        order_by = query_fields.pop("order_by", None)
         search = query_fields.pop("search", "")
 
         try:
@@ -250,10 +250,12 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
         else:
             return results
 
-    def get_by_id(self, *, db: Session, id: str):
+    def get_by_id(
+        self, *, db: Session, post_id: str
+    ) -> tuple[models.Post | int]:
         """Returns a single post by its id."""
         try:
-            UUID(str(id))
+            UUID(str(post_id))
         except (ValueError, AttributeError) as error:
             raise HTTPException(
                 detail="invalid post id",
@@ -266,7 +268,7 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
                 )
                 .outerjoin(models.Vote, models.Vote.post_id == models.Post.id)
                 .group_by(models.Post.id)
-                .filter(models.Post.id == id)
+                .filter(models.Post.id == post_id)
                 .first()
             )
 
@@ -293,7 +295,7 @@ class VoteCrud(APICrudBase[models.Vote, schemas.Vote]):
         )
 
         # ensure the post exists before moving forward
-        PostCrud().get_by_id(db=db, id=vote.post_id)
+        PostCrud().get_by_id(db=db, post_id=str(vote.post_id))
 
         if vote.status:
             if vote_found:
