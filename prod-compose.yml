@@ -1,0 +1,19 @@
+# Docker compose file for production environment
+services:
+  api:
+    image: nanafox/we-connect-api:v0.1.0
+    ports:
+      - "8080:8000"  # update the port to the one you want to use
+    depends_on:
+      - postgres_host
+    env_file: ".env"
+  postgres_host:
+    image: postgres
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+    volumes:
+      - postgres-db:/var/lib/postgresql/data
+volumes:
+  postgres-db:
