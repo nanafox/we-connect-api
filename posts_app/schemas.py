@@ -50,8 +50,7 @@ class PostCreateUpdate(PostBase):
                 {
                     "title": "Getting Started with query parameters",
                     "content": "This tutorial will take you through the "
-                    "basics "
-                    "of query parameters. Stay tuned.",
+                    "basics of query parameters. Stay tuned.",
                 },
             ]
         }

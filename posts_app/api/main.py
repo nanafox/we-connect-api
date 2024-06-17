@@ -3,12 +3,11 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from posts_app import schemas
-from posts_app.api.routers import auth, posts, UserDependency, users, votes
+from posts_app.api.routers import UserDependency, auth, posts, users, votes
 from posts_app.config import settings
 
 load_dotenv()
 
-# models.Base.metadata.create_all(bind=engine)
 if settings.dev:
     servers = {"url": "http://localhost:8000"}
 else:

@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import uuid4
 
 import sqlalchemy
-from sqlalchemy import Boolean, ForeignKey, func, String, text, TIMESTAMP
+from sqlalchemy import TIMESTAMP, Boolean, ForeignKey, String, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from posts_app.database import Base
@@ -10,7 +10,7 @@ from posts_app.utils import UtilMixin
 
 
 class Post(Base, UtilMixin):
-    """Model for Posts"""
+    """Model for posts"""
 
     __tablename__ = "posts"
 
@@ -24,9 +24,7 @@ class Post(Base, UtilMixin):
     )
     title: Mapped[str] = mapped_column(String, index=True)
     content: Mapped[str] = mapped_column(String, index=True)
-    published: Mapped[bool] = mapped_column(
-        Boolean, server_default="True", nullable=False
-    )
+    published: Mapped[bool] = mapped_column(Boolean, server_default="True")
     created_at: Mapped[TIMESTAMP] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()")
     )
@@ -47,6 +45,8 @@ class Post(Base, UtilMixin):
 
 
 class User(Base, UtilMixin):
+    """Model for users."""
+
     __tablename__ = "users"
 
     id: Mapped[sqlalchemy.Uuid] = mapped_column(
@@ -73,6 +73,8 @@ class User(Base, UtilMixin):
 
 
 class Vote(Base, UtilMixin):
+    """Model for votes."""
+
     __tablename__ = "votes"
 
     user_id: Mapped[sqlalchemy.Uuid] = mapped_column(
