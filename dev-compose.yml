@@ -1,0 +1,25 @@
+# Compose file for development environment
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres_host
+    volumes:
+      - ./:/usr/src/app
+    command: uvicorn posts_app.api.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      DEV: True
+    env_file: ".env"
+  postgres_host:
+    image: postgres
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+    volumes:
+      - postgres-db:/var/lib/postgresql/data
+volumes:
+  postgres-db:
