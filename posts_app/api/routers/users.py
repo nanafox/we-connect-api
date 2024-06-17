@@ -66,7 +66,7 @@ async def create_user(
     request: Request,
 ):
     """This endpoint creates a new user."""
-    data = dict(request.headers.list)
+    data = dict(request.headers._list)
     bearer_token = data.get("authorization", None)
 
     # let's verify if the bearer token was set, it shouldn't be set when
