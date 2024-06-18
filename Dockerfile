@@ -23,4 +23,4 @@ CMD alembic upgrade head && uvicorn posts_app.api.main:app --host 0.0.0.0 --port
 
 # Continuously check the health of the application
 HEALTHCHECK --interval=60s --timeout=30s \
-  CMD curl --fail http://localhost:8000/api/status || exit 1
+    CMD curl --fail http://localhost:8000/api/status || exit 1
