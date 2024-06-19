@@ -46,13 +46,3 @@ quote-style = "double"
 line-ending = "auto"
 docstring-code-format = true
 docstring-code-line-length = 78
-unused-imports = false
-
-
-[tool.prettier]
-ignore = ['**/.html']
-trailingComma = "es5"
-tabWidth = 2
-semi = true
-singleQuote = true
-singleAttributePerLine = true
