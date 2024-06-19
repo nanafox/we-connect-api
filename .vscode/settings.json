@@ -1,0 +1,11 @@
+{
+    "python.testing.pytestArgs": [
+        "tests",
+        "--disable-warnings",
+        "-s",
+        "-x",
+        "-v"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}
