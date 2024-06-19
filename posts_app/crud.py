@@ -35,7 +35,7 @@ class APICrudBase(Generic[ModelType, SchemaType]):
     def get_by_id(self, *, db: Session, obj_id: str) -> ModelType:
         """Returns a single object by its id."""
         try:
-            UUID(str(obj_id))
+            UUID(obj_id)
         except (ValueError, AttributeError) as error:
             print(error)
             raise HTTPException(
@@ -89,6 +89,7 @@ class APICrudBase(Generic[ModelType, SchemaType]):
                 )
             return self.model().save(**schema.model_dump(), db=db)
         except Exception as error:
+            print(error)
             raise HTTPException(
                 detail={
                     "message": f"Error creating {self.model_name}",
@@ -106,7 +107,7 @@ class APICrudBase(Generic[ModelType, SchemaType]):
         obj_owner_id: str,
     ):
         obj = self.get_by_id(db=db, obj_id=obj_id)
-        if not obj_owner_id == obj.id:
+        if obj_owner_id != obj.id:
             raise HTTPException(
                 detail="You are not authorized to update this "
                 f"{self.model_name}",
@@ -130,7 +131,7 @@ class APICrudBase(Generic[ModelType, SchemaType]):
         obj_owner_id: str,
     ):
         obj = self.get_by_id(db=db, obj_id=obj_id)
-        if not obj_owner_id == obj.id:
+        if obj_owner_id != obj.id:
             raise HTTPException(
                 detail="You are not authorized to delete this "
                 f"{self.model_name}",
@@ -147,7 +148,7 @@ class APICrudBase(Generic[ModelType, SchemaType]):
         obj_owner_id: str,
     ):
         stored_obj = self.get_by_id(obj_id=obj_id, db=db)
-        if not obj_owner_id == stored_obj.id:
+        if obj_owner_id != stored_obj.id:
             raise HTTPException(
                 detail=f"You are not authorized to update this "
                 f"{self.model_name}",
@@ -173,7 +174,7 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
     ):
         """Update a post."""
         post = self.get_by_id(db=db, post_id=post_id)[0]
-        if not user_id == post.user_id:
+        if user_id != post.user_id:
             raise HTTPException(
                 detail="You are not authorized to update this post",
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -188,7 +189,7 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
     ):
         """Delete a post."""
         post = self.get_by_id(db=db, post_id=post_id)[0]
-        if not user_id == post.user_id:
+        if user_id != post.user_id:
             raise HTTPException(
                 detail="You are not authorized to delete this post",
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -205,7 +206,7 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
     ):
         """Partially update a post."""
         stored_post = self.get_by_id(post_id=post_id, db=db)[0]
-        if not user_id == stored_post.user_id:
+        if user_id != stored_post.user_id:
             raise HTTPException(
                 detail="You are not authorized to update this post",
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -258,7 +259,7 @@ class PostCrud(APICrudBase[models.Post, schemas.Post]):
     ) -> Row[tuple[models.Post, int]]:
         """Returns a single post by its id."""
         try:
-            UUID(str(post_id))
+            UUID(post_id)
         except (ValueError, AttributeError) as error:
             raise HTTPException(
                 detail="invalid post id",

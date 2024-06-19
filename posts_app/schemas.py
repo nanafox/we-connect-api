@@ -1,8 +1,9 @@
+from pydantic import Field
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, HttpUrl
+from pydantic import BaseModel, ConfigDict, EmailStr, HttpUrl
 
 
 class PostBase(BaseModel):
@@ -21,8 +22,7 @@ class Post(PostBase):
     updated_at: datetime
     user: "PostOwner"
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PostResponse(BaseModel):
@@ -90,7 +90,7 @@ class UserBase(BaseModel):
 
 
 class UserCreateUpdate(UserBase):
-    password: str
+    password: str = Field(..., min_length=8)
 
 
 class User(UserBase):
@@ -98,8 +98,7 @@ class User(UserBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class StatusResponse(BaseModel):
